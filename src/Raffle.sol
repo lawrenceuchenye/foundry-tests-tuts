@@ -215,6 +215,9 @@ contract Raffle is VRFV2PlusWrapperConsumerBase, ConfirmedOwner, AutomationCompa
         return (request.paid, request.fulfilled, request.randomWords);
     }
 
+function setRaffleToCal() public{
+    rstate=RafState.Calculating;
+}
     /**
      * Allow withdraw of Link tokens from the contract
      */
