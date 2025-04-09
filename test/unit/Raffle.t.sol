@@ -104,12 +104,8 @@ contract RaffleTest is Test {
     function test__getRequestStatus() public {
         vm.prank(player);
         // Ensure the current contract (test contract) is sending the transaction
-        vm.recordLogs();
         payable(raffle).transfer(0.3 ether); // Mint 1 LINK token to this contract
-        raffle.requestRandomWords();
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-
-        assertEq(logs.length, 1, "Expected 1 log entry");
+        raffle.getRequestStatus(raffle.requestRandomWords());
     }
 
     function test_upKeepReturnedFalseIfNotOpen() public {

@@ -149,7 +149,6 @@ contract Raffle is VRFV2PlusWrapperConsumerBase, ConfirmedOwner, AutomationCompa
         if (block.timestamp - lastTimeStamp < i_interval) {
             revert NotYetTimeToPickWinner();
         }
-        rstate = RafState.Calculating;
         bytes memory extraArgs =
             VRFV2PlusClient._argsToBytes(VRFV2PlusClient.ExtraArgsV1({nativePayment: enableNativePayment}));
         uint256 requestId;
