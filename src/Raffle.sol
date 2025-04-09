@@ -14,10 +14,11 @@ contract Raffle is VRFV2PlusWrapperConsumerBase, ConfirmedOwner, AutomationCompa
     uint256 private immutable i_entranceFee;
     uint256 private immutable i_interval;
     uint256 private lastTimeStamp;
-    bool public enableNativePayment = false;
+    bool public enableNativePayment = true;
 
     error upKeepNotNeed(uint256 rafState);
     error NotEnoughEthToEnter();
+    error NotYetTimeToPickWinner();
 
     address payable[] public s_players;
 
@@ -82,7 +83,7 @@ contract Raffle is VRFV2PlusWrapperConsumerBase, ConfirmedOwner, AutomationCompa
         rstate = RafState.isOpen;
     }
 
-    function getRafState() external returns (RafState) {
+    function getRafState() external view returns (RafState) {
         return rstate;
     }
 
@@ -146,7 +147,7 @@ contract Raffle is VRFV2PlusWrapperConsumerBase, ConfirmedOwner, AutomationCompa
 
     function pickWinner() external onlyOwner returns (uint256) {
         if (block.timestamp - lastTimeStamp < i_interval) {
-            revert();
+            revert NotYetTimeToPickWinner();
         }
         rstate = RafState.Calculating;
         bytes memory extraArgs =
@@ -170,8 +171,7 @@ contract Raffle is VRFV2PlusWrapperConsumerBase, ConfirmedOwner, AutomationCompa
         return i_entranceFee;
     }
 
-    /*
-    function requestRandomWords(bool enableNativePayment) external onlyOwner returns (uint256) {
+    function requestRandomWords() external onlyOwner returns (uint256) {
         bytes memory extraArgs =
             VRFV2PlusClient._argsToBytes(VRFV2PlusClient.ExtraArgsV1({nativePayment: enableNativePayment}));
         uint256 requestId;
@@ -187,7 +187,7 @@ contract Raffle is VRFV2PlusWrapperConsumerBase, ConfirmedOwner, AutomationCompa
         lastRequestId = requestId;
         emit RequestSent(requestId, numWords);
         return requestId;
-    }*/
+    }
 
     function fulfillRandomWords(uint256 _requestId, uint256[] memory _randomWords) internal override {
         require(s_requests[_requestId].paid > 0, "request not found");
@@ -215,12 +215,13 @@ contract Raffle is VRFV2PlusWrapperConsumerBase, ConfirmedOwner, AutomationCompa
         return (request.paid, request.fulfilled, request.randomWords);
     }
 
-function setRaffleToCal() public{
-    rstate=RafState.Calculating;
-}
+    function setRaffleToCal() public {
+        rstate = RafState.Calculating;
+    }
     /**
      * Allow withdraw of Link tokens from the contract
      */
+
     function withdrawLink() public onlyOwner {
         LinkTokenInterface link = LinkTokenInterface(linkAddress);
         require(link.transfer(msg.sender, link.balanceOf(address(this))), "Unable to transfer");

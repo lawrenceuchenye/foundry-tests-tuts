@@ -18,6 +18,11 @@ contract RaffleTest is Test {
     address public player = makeAddr("PLAYER");
     LinkToken public lt;
 
+    enum RafState {
+        isOpen,
+        Calculating
+    }
+
     function setUp() public {
         lt = new LinkToken();
         raffle = new Raffle(0.001 ether, 30);
@@ -71,32 +76,76 @@ contract RaffleTest is Test {
         raffle.enterRaf{value: 0.004 ether}();
     }
 
-
-    /*function test_PickWinner() public {
+    function test_PickWinner() public {
         //A1
         vm.prank(player);
-        uint256 raffleBalanceBefore = lt.balanceOf(address(raffle));
-        vm.prank(address(raffle)); // Ensure the current contract (test contract) is sending the transaction
-        lt.transfer(address(raffle), 1e18); // Mint 1 LINK token to this contract
+        // Ensure the current contract (test contract) is sending the transaction
+        payable(raffle).transfer(0.3 ether); // Mint 1 LINK token to this contract
+        vm.warp(block.timestamp + 30 + 1);
+        raffle.enterRaf{value: 0.004 ether}();
+        assert(raffle.pickWinner() > 0);
+        vm.roll(block.number + 1);
+    }
 
-        console.log("Raffle contract balance before: ", raffleBalanceBefore);
-    }*/
-
-    function test_upKeepNeeded() public{
-        vm.warp(block.timestamp+30+1);
-        vm.roll(block.number+1);
-        (bool upkeepNeeded,)=raffle.checkUpkeep("");
+    function test_upKeepNeeded() public {
+        vm.warp(block.timestamp + 30 + 1);
+        vm.roll(block.number + 1);
+        (bool upkeepNeeded,) = raffle.checkUpkeep("");
         assert(!upkeepNeeded);
     }
 
-    function test_upKeepReturnedFalseIfNotOpen() public{
+    function test__requestRandomWords() public {
         vm.prank(player);
-           raffle.enterRaf{value: 0.004 ether}();
-           raffle.setRaffleToCal();
-  vm.warp(block.timestamp+30+1);
-        vm.roll(block.number+1);
+        // Ensure the current contract (test contract) is sending the transaction
+        payable(raffle).transfer(0.3 ether); // Mint 1 LINK token to this contract
+        assert(raffle.requestRandomWords() > 0);
+    }
 
-        (bool upkeepNeeded,)=raffle.checkUpkeep("");
+    function test__getRequestStatus() public {
+        vm.prank(player);
+        // Ensure the current contract (test contract) is sending the transaction
+        vm.recordLogs();
+        payable(raffle).transfer(0.3 ether); // Mint 1 LINK token to this contract
+        raffle.requestRandomWords();
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        assertEq(logs.length, 1, "Expected 1 log entry");
+    }
+
+    function test_upKeepReturnedFalseIfNotOpen() public {
+        vm.prank(player);
+        raffle.enterRaf{value: 0.004 ether}();
+        raffle.setRaffleToCal();
+        vm.warp(block.timestamp + 30 + 1);
+        vm.roll(block.number + 1);
+
+        (bool upkeepNeeded,) = raffle.checkUpkeep("");
         assert(!upkeepNeeded);
+    }
+
+    function test__GetStateEqSetState() public {
+        assert(uint256(raffle.getRafState()) == uint256(RafState.isOpen));
+    }
+
+    function test_GetRafFee() public {
+        assert(raffle.getRafFee() == 0.001 ether);
+    }
+
+    function test_GetPlayer() public {
+        //A
+        vm.prank(player);
+        raffle.enterRaf{value: 0.001 ether}();
+
+        //A1
+        assert(raffle.getPlayer(0) == player);
+    }
+
+    function test_FulFillRandomWords() public {
+        vm.prank(player);
+        // Ensure the current contract (test contract) is sending the transaction
+        payable(raffle).transfer(0.5 ether); // Mint 1 LINK token to this contract
+        vm.warp(block.timestamp + 30 + 1);
+        raffle.enterRaf{value: 0.004 ether}();
+        vm.roll(block.number + 1);
     }
 }
