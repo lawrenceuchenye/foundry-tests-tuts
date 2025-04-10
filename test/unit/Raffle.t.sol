@@ -14,7 +14,7 @@ contract RaffleTest is Test {
     Raffle public raffle;
 
     event newEntry(address indexed entree, uint256 ethPush);
-
+uint256[] randomWords;
     address public player = makeAddr("PLAYER");
     LinkToken public lt;
 
@@ -76,6 +76,15 @@ contract RaffleTest is Test {
         raffle.enterRaf{value: 0.004 ether}();
     }
 
+    modifier rafEntered() {
+        vm.prank(player);
+        payable(raffle).transfer(0.3 ether); // Mint 1 LINK token to this contract
+        vm.warp(block.timestamp + 30 + 1);
+        raffle.enterRaf{value: 0.01 ether}();
+        vm.roll(block.number + 1);
+        _;
+    }
+
     function test_PickWinner() public {
         //A1
         vm.prank(player);
@@ -83,7 +92,9 @@ contract RaffleTest is Test {
         payable(raffle).transfer(0.3 ether); // Mint 1 LINK token to this contract
         vm.warp(block.timestamp + 30 + 1);
         raffle.enterRaf{value: 0.004 ether}();
+        console.log(address(raffle).balance);
         assert(raffle.pickWinner() > 0);
+        console.log(address(raffle).balance);
         vm.roll(block.number + 1);
     }
 
@@ -108,9 +119,14 @@ contract RaffleTest is Test {
         raffle.getRequestStatus(raffle.requestRandomWords());
     }
 
+    function test__upKeepNeed() public rafEntered{
+        (bool upkeep,)=raffle.checkUpkeep("");
+assert(upkeep==true);
+    }
+
     function test_upKeepReturnedFalseIfNotOpen() public {
         vm.prank(player);
-        raffle.enterRaf{value: 0.004 ether}();
+        raffle.enterRaf{value: 0.01 ether}();
         raffle.setRaffleToCal();
         vm.warp(block.timestamp + 30 + 1);
         vm.roll(block.number + 1);
@@ -136,12 +152,15 @@ contract RaffleTest is Test {
         assert(raffle.getPlayer(0) == player);
     }
 
-    function test_FulFillRandomWords() public {
-        vm.prank(player);
-        // Ensure the current contract (test contract) is sending the transaction
-        payable(raffle).transfer(0.5 ether); // Mint 1 LINK token to this contract
-        vm.warp(block.timestamp + 30 + 1);
-        raffle.enterRaf{value: 0.004 ether}();
-        vm.roll(block.number + 1);
+    function test_PerformUpKeep() public rafEntered{
+        raffle.performUpkeep("0x");
+        assert(uint256(raffle.getRafState())==uint256(RafState.Calculating));
     }
+
+    
+    function test_NotPerformUpKeepIfNotNeeded() public{
+        vm.expectRevert(Raffle.upKeepNotNeed.selector);
+        raffle.performUpkeep("");
+    }
+
 }

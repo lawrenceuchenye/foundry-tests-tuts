@@ -16,7 +16,7 @@ contract Raffle is VRFV2PlusWrapperConsumerBase, ConfirmedOwner, AutomationCompa
     uint256 private lastTimeStamp;
     bool public enableNativePayment = true;
 
-    error upKeepNotNeed(uint256 rafState);
+    error upKeepNotNeed();
     error NotEnoughEthToEnter();
     error NotYetTimeToPickWinner();
 
@@ -31,7 +31,7 @@ contract Raffle is VRFV2PlusWrapperConsumerBase, ConfirmedOwner, AutomationCompa
     event newEntry(address indexed entree, uint256 ethPush);
     event RequestSent(uint256 requestId, uint32 numWords);
     event RequestFulfilled(uint256 requestId, uint256[] randomWords, uint256 payment);
-
+    event test_(bool success,uint256 bal);
     struct RequestStatus {
         uint256 paid;
         // amount paid in link
@@ -92,7 +92,7 @@ contract Raffle is VRFV2PlusWrapperConsumerBase, ConfirmedOwner, AutomationCompa
         _;
     }
 
-    function checkUpkeep(bytes memory /* checkData */ )
+    function checkUpkeep(bytes memory checkData )
         public
         view
         override
@@ -113,7 +113,7 @@ contract Raffle is VRFV2PlusWrapperConsumerBase, ConfirmedOwner, AutomationCompa
     function performUpkeep(bytes calldata /* performData */ ) external {
         (bool upkeep,) = checkUpkeep("");
         if (!upkeep) {
-            revert upKeepNotNeed(uint256(rstate));
+            revert upKeepNotNeed();
         }
         rstate = RafState.Calculating;
         bytes memory extraArgs =
@@ -190,15 +190,23 @@ contract Raffle is VRFV2PlusWrapperConsumerBase, ConfirmedOwner, AutomationCompa
 
     function fulfillRandomWords(uint256 _requestId, uint256[] memory _randomWords) internal override {
         require(s_requests[_requestId].paid > 0, "request not found");
+        require(s_players.length > 0, "No players available");
+        require(address(this).balance-0.3 ether > 0,"Not Enough Eth in Contract");
+
         s_requests[_requestId].fulfilled = true;
         s_requests[_requestId].randomWords = _randomWords;
         emit RequestFulfilled(_requestId, _randomWords, s_requests[_requestId].paid);
+
         uint256 iow = _randomWords[0] % s_players.length;
-        address payable rw = s_players[iow];
+         address payable rw = s_players[iow];
+      
         rstate = RafState.isOpen;
         s_players = new address payable[](0);
         lastTimeStamp = block.timestamp;
-        (bool success,) = rw.call{value: address(this).balance}("");
+
+        bool success= rw.send(address(this).balance);
+        emit test_(success,rw.balance);
+
         if (!success) {
             revert rafTxFailed();
         }
@@ -221,13 +229,6 @@ contract Raffle is VRFV2PlusWrapperConsumerBase, ConfirmedOwner, AutomationCompa
      * Allow withdraw of Link tokens from the contract
      */
 
-    function withdrawLink() public onlyOwner {
-        LinkTokenInterface link = LinkTokenInterface(linkAddress);
-        require(link.transfer(msg.sender, link.balanceOf(address(this))), "Unable to transfer");
-    }
-
-    /// @notice withdrawNative withdraws the amount specified in amount to the owner
-    /// @param amount the amount to withdraw, in wei
     function withdrawNative(uint256 amount) external onlyOwner {
         (bool success,) = payable(owner()).call{value: amount}("");
         // solhint-disable-next-line gas-custom-errors
